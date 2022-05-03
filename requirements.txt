@@ -1,0 +1,2 @@
+# Required for plugins handling certificate objects
+cryptography>=37.0.1
