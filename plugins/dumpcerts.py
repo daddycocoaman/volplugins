@@ -15,8 +15,7 @@ from cryptography.hazmat.primitives.serialization import (
 )
 from cryptography.utils import CryptographyDeprecationWarning
 from cryptography.x509 import Certificate, load_der_x509_certificate
-
-from volatility3.framework import interfaces, renderers
+from volatility3.framework import interfaces, objects, renderers
 from volatility3.framework.configuration import requirements
 from volatility3.framework.renderers import format_hints
 from volatility3.plugins import yarascan
@@ -84,6 +83,7 @@ class Dumpcerts(interfaces.plugins.PluginInterface):
             sources[
                 "x509"
             ] = "rule x509 {strings: $a = {30 82 ?? ?? 30 82 ?? ??} condition: $a}"
+
         if key_type in ["all", "private"]:
             sources[
                 "pkcs"
@@ -228,18 +228,14 @@ class Dumpcerts(interfaces.plugins.PluginInterface):
     def _generator(self, physical: bool):
 
         kernel = self.context.modules[self.config["kernel"]]
-        
-        pid_list = self.config.get("pid", None)
-        name_list = self.config.get("name", None)
-        pid_filter = pslist.PsList.create_pid_filter(pid_list)
-        name_filter = pslist.PsList.create_name_filter(name_list)
+        pid_list = self.config.get("pid", [])
+        name_list = self.config.get("name", [])
 
-        if pid_list:
-            filter_func = pid_filter
-        elif name_list:
-            filter_func = name_filter
-        else:
-            filter_func = lambda _: False
+        filter_func = (
+            lambda proc: proc.UniqueProcessId not in pid_list
+            and objects.utility.array_to_string(proc.ImageFileName).lower()
+            not in name_list
+        )
 
         key_type = self.config.get("type")
         output = self.config.get("dump", False)
@@ -265,7 +261,7 @@ class Dumpcerts(interfaces.plugins.PluginInterface):
                 layer_name=kernel.layer_name,
                 symbol_table=kernel.symbol_table_name,
                 filter_func=filter_func,
-                key_types=key_type
+                key_types=key_type,
             ):
 
                 proc_name = proc.ImageFileName.cast(
@@ -304,14 +300,13 @@ class Dumpcerts(interfaces.plugins.PluginInterface):
         if rule_name == "x509":
 
             value = "".join(
-                        "{:02X}".format(b)
-                        for b in rsa_object.fingerprint(hashes.SHA1())
-                    )
+                "{:02X}".format(b) for b in rsa_object.fingerprint(hashes.SHA1())
+            )
             try:
                 value += "_" + str(rsa_object.subject.rfc4514_string())
             except:
                 pass
-            
+
             output_bytes = rsa_object.public_bytes(Encoding.DER)
 
         # If pkcs triggered, value is equal to the key size
