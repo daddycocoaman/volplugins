@@ -231,11 +231,14 @@ class Dumpcerts(interfaces.plugins.PluginInterface):
         pid_list = self.config.get("pid", [])
         name_list = self.config.get("name", [])
 
-        filter_func = (
-            lambda proc: proc.UniqueProcessId not in pid_list
-            and objects.utility.array_to_string(proc.ImageFileName).lower()
-            not in name_list
-        )
+        if pid_list or name_list:
+            filter_func = (
+                lambda proc: proc.UniqueProcessId not in pid_list
+                and objects.utility.array_to_string(proc.ImageFileName).lower()
+                not in name_list
+            )
+        else:
+            filter_func = lambda x: False
 
         key_type = self.config.get("type")
         output = self.config.get("dump", False)
