@@ -1,2 +1,3 @@
 # Required for plugins handling certificate objects
 cryptography>=37.0.1
+pypykatz>=0.6.6
